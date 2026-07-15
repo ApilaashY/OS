@@ -1,88 +1,70 @@
 # os
 
-A simple shell/OS project written in C++23, using C++ modules.
+A small C++ shell project intended to run as a Linux userspace program.
+It is not a Linux kernel component. If you want to use it with QEMU, boot a
+Linux kernel and run this shell from an initramfs or as a normal userspace
+binary.
 
-## Requirements
+## What works in this setup
 
-| Tool | Minimum Version | Notes |
-|------|----------------|-------|
-| CMake | 3.28+ | Required for `FILE_SET CXX_MODULES` support |
-| Ninja | any | Used as the build generator |
-| Clang | 17+ **or** GCC 14+ | Needed for C++23 module support |
+The current code uses normal Linux userspace APIs such as `fork`, `execvp`,
+`waitpid`, `chdir`, `std::string`, and standard I/O. Those are fine for a
+Linux userspace shell.
 
-### macOS — install dependencies via Homebrew
+What does not apply here is compiling the project *into* the Linux kernel.
+That would require a full kernel rewrite with Linux kernel APIs and no libc.
 
-```bash
-brew install cmake ninja llvm
-```
+## Build
 
-> After installing LLVM via Homebrew, make sure `clang++` from Homebrew is on your `PATH`:
-> ```bash
-> export PATH="$(brew --prefix llvm)/bin:$PATH"
-> ```
-> Add this to your `~/.zshrc` to make it permanent.
-
----
-
-## Building
-
-### 1. Configure
+Use Docker to build Linux artifacts for the QEMU guest.
 
 ```bash
-cmake --preset default
+./scripts/build_shell.sh
+./scripts/build_kernel.sh
 ```
 
-This creates a `build/` directory, selects the Ninja generator, and sets the build type to `Debug`. It also generates `build/compile_commands.json` for IntelliSense / clangd.
+## QEMU usage
 
-### 2. Compile
+Typical flow:
 
-```bash
-cmake --build --preset default
-```
+1. Build the shell for Linux userspace.
+2. Create an initramfs containing the binary as `/init`.
+3. Boot a Linux kernel in QEMU and point it at that initramfs.
 
-The compiled binary will be at `build/os`.
+The shell can then be the first userspace process.
 
-### One-liner
+### Helper scripts
 
-```bash
-cmake --preset default && cmake --build --preset default
-```
+- `scripts/fetch_kernel.sh` downloads and extracts a Linux kernel source tree.
+- `scripts/build_shell.sh` builds a Linux ELF version of the shell inside Docker.
+- `scripts/build_kernel.sh` builds a `bzImage` from that source tree.
+- `scripts/boot_qemu.sh` packages the shell into an initramfs and boots QEMU.
 
----
+These scripts assume Docker and an x86_64 QEMU guest.
 
-## Running
+## Libraries and code to keep/remove
 
-```bash
-./build/os
-```
+Keep:
+- `<iostream>`
+- `<unistd.h>`
+- `<sys/wait.h>`
 
-The shell reads lines from stdin and splits them into arguments. Type your input and press Enter.
+Remove only if you rewrite the project as kernel code:
 
----
+- `fork`
+- `execvp`
+- `waitpid`
+- `chdir`
+- all standard C++ I/O and STL usage
 
-## IntelliSense / clangd setup
-
-After a successful configure step, `build/compile_commands.json` is generated automatically. Most editors pick this up without extra configuration:
-
-- **VS Code** (clangd extension): add to `.vscode/settings.json`:
-  ```json
-  {
-    "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/build"]
-  }
-  ```
-- **CLion**: automatically detects `compile_commands.json` from the CMake build directory.
-- **Neovim** (clangd via LSP): points to the `build/` folder by default when using `cmake-tools`.
-
----
-
-## Project Structure
+## Project structure
 
 ```
 os/
-├── CMakeLists.txt              # Build definition (C++23 + modules)
-├── CMakePresets.json           # Build presets (Ninja, Debug, compile_commands)
-├── main.cpp                    # Entry point
+├── CMakeLists.txt
+├── CMakePresets.json
+├── main.cpp
 └── string_helpers/
-    ├── string_helpers.cppm     # Module interface unit (export module)
-    └── string_helpers.cpp      # Module implementation unit
+    ├── string_helpers.cppm
+    └── string_helpers.cpp
 ```

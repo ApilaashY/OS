@@ -4,16 +4,13 @@
     {
       "name": "default",
       "displayName": "Default (C++23)",
-      "description": "Build with C++23 support on macOS using Homebrew LLVM",
+      "description": "Build with C++23 support using the active compiler/toolchain",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_STANDARD": "23",
-        "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
-        "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
-        "CMAKE_CXX_FLAGS": "-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+        "CMAKE_CXX_STANDARD": "23"
       }
     }
   ],
