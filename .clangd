@@ -1,0 +1,4 @@
+CompileFlags:
+  CompilationDatabase: build/
+  Add: [-std=c++23, -fcxx-modules, -fimplicit-modules]
+  Remove: [-fno-cxx-modules, -fno-implicit-modules]

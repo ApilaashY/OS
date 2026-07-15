@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "CMake",
+            "compilerPath": "/opt/homebrew/opt/llvm/bin/clang++",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "cStandard": "c17",
+            "cppStandard": "c++23",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "intelliSenseMode": "macos-clang-arm64",
+            "browse": {
+                "path": ["${workspaceFolder}"]
+            }
+        }
+    ],
+    "version": 4
+}
