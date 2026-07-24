@@ -1,0 +1,5 @@
+Summary of kernel build process:
+1. Created Dockerfile with proper toolchain packages
+2. Fixed EFI package installation issue for ARM64 environments
+3. Successfully configured kernel with required features (DRM, USB, input)
+4. Identified and documented objtool compilation limitations in ARM64 containers

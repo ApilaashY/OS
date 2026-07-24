@@ -2,6 +2,8 @@
 build/
 out/
 .cache/
+build-linux/
+initramfs/
 
 # CMake generated
 CMakeFiles/
@@ -22,3 +24,4 @@ lib/
 
 *.DS_Store
 linux-kernel/
+*.gz

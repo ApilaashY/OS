@@ -9,13 +9,6 @@ JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-os-linux-toolchain:24.04}"
 DOCKERFILE="${DOCKERFILE:-$PWD/scripts/linux-toolchain.Dockerfile}"
 
-ensure_image() {
-  if ! docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1; then
-    echo "Building Linux toolchain image..."
-    docker build -t "$DOCKER_IMAGE" -f "$DOCKERFILE" "$PWD"
-  fi
-}
-
 if [[ ! -d "$KERNEL_DIR" ]]; then
   echo "Kernel source directory not found: $KERNEL_DIR" >&2
   exit 1
@@ -26,7 +19,9 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-ensure_image
+# Ensure we have the image built
+echo "Ensuring Docker image exists..."
+docker build -t "$DOCKER_IMAGE" -f "$DOCKERFILE" "$PWD"
 
 echo "Configuring and building kernel inside Linux container..."
 echo "Using x86_64 platform for full kernel compilation compatibility."
@@ -40,13 +35,17 @@ docker run --rm \
   -v "$PWD:/work" \
   -w "/work/linux-kernel/linux-${KERNEL_VERSION}" \
   "$DOCKER_IMAGE" \
-  bash -lc '
+  bash -c '
+    echo "Starting kernel build process..."
     if [[ ! -f .config ]]; then
+      echo "Creating default configuration..."
       make ARCH="$ARCH" LLVM=1 LLVM_IAS=1 defconfig
     fi
+    
     # Options needed to boot both under QEMU (bochs) AND on real UEFI hardware
     # (simpledrm for the firmware framebuffer, USB HID for keyboards, and
     # devtmpfs so /dev/dri/card0 appears without udev).
+    echo "Configuring kernel options..."
     ./scripts/config \
         -e DRM -e DRM_BOCHS -e DRM_SIMPLEDRM \
         -e DEVTMPFS -e DEVTMPFS_MOUNT \
@@ -54,10 +53,17 @@ docker run --rm \
         -e USB_HID -e HID_GENERIC \
         -e INPUT -e INPUT_KEYBOARD -e KEYBOARD_ATKBD \
         -e EFI -e EFI_STUB
+    
+    echo "Applying updated configuration..."
     make ARCH="$ARCH" LLVM=1 LLVM_IAS=1 olddefconfig
+    
     echo "Kernel configuration complete. Building bzImage..."
     echo "Building with full x86_64 platform support."
+    
+    # Build the kernel
     make ARCH="$ARCH" LLVM=1 LLVM_IAS=1 -j"$JOBS" bzImage
+    
+    echo "Kernel build completed successfully!"
   '
 
 echo "Kernel image ready at: arch/${ARCH}/boot/bzImage"

@@ -73,7 +73,8 @@ docker run --rm \
 echo "Booting QEMU..."
 exec "$QEMU_BIN" \
   -m 512M \
-  -nographic \
+  -vga std \
+  -serial mon:stdio \
   -kernel "$KERNEL_IMAGE" \
   -initrd "$INITRAMFS_IMAGE" \
   -append "console=ttyS0 rdinit=/init"

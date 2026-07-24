@@ -2,15 +2,12 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install common packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bc \
     bison \
     build-essential \
     ca-certificates \
     clang \
-    clang-18 \
-    clang-tools-18 \
     cmake \
     cpio \
     curl \
@@ -19,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     flex \
     git \
     grub-common \
+    grub-efi-amd64-bin \
     libelf-dev \
     libncurses-dev \
     libssl-dev \
