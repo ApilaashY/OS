@@ -1,10 +1,8 @@
-module;
-
 #include <string>
 #include <sstream>
 #include <iostream>
 
-module string_helpers;
+#include "string_helpers.h"
 
 std::string os_readline() {
     std::string line;

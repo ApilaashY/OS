@@ -9,18 +9,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Force scanning on (CMake 3.28+ will handle the rest natively)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
-
 # --- string_helpers module ---
-add_library(string_helpers)
-target_sources(string_helpers
-    PRIVATE
-        string_helpers/string_helpers.cpp
-    PUBLIC
-        FILE_SET CXX_MODULES FILES
-            string_helpers/string_helpers.cppm
+add_library(string_helpers
+    string_helpers/string_helpers.cpp
 )
+target_include_directories(string_helpers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/string_helpers)
 target_compile_features(string_helpers PUBLIC cxx_std_23)
 
 # --- main executable ---

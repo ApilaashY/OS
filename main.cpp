@@ -10,10 +10,15 @@
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <poll.h>
+
+// Only include DRM headers if we're building for kernel (not userspace)
+#ifndef NO_DRM_HEADERS
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#endif
 
-import string_helpers;
+#include "string_helpers/string_helpers.h"
 
 using namespace std;
 
@@ -297,7 +302,10 @@ static void os_show_boot_pixels() {
         clock_gettime(CLOCK_MONOTONIC, &next_frame);
 
         int back = 1;                       // buf[0] is on screen; draw into buf[1]
-        while (true) {
+        // Keep the boot animation visible long enough to be clearly seen in
+        // QEMU before control returns to the shell.
+        constexpr int BOOT_ANIM_FRAMES = 36000; // ~10 minutes at 60 fps
+        for (int frame = 0; frame < BOOT_ANIM_FRAMES; ++frame) {
             Buf& b = bufs[back];
 
             // --- clear + draw the moving 70x70 square ---
@@ -345,12 +353,24 @@ static void os_show_boot_pixels() {
             }
 
             // --- drain the flip-complete event ---
-            // The drm fd delivers events as a stream of drm_event records.
-            // We must consume this one so the fd isn't perpetually readable
-            // and so we know the OTHER buffer is now safe to draw into.
+            // Some virtual GPUs/drivers may not deliver flip events reliably.
+            // Do not block forever waiting for one; if no event arrives
+            // promptly, stop the animation and continue booting to the shell.
+            pollfd pfd{};
+            pfd.fd = fd;
+            pfd.events = POLLIN;
+            int pr = poll(&pfd, 1, 100);
+            if (pr <= 0) {
+                cerr << "os: DRM flip event timeout, continuing boot\n";
+                break;
+            }
+
             char evbuf[128];
             ssize_t n = read(fd, evbuf, sizeof(evbuf));
-            (void)n;
+            if (n <= 0) {
+                cerr << "os: DRM flip event read failed, continuing boot\n";
+                break;
+            }
 
             // Swap: the buffer we just showed becomes the front; we draw the
             // next frame into the one that WAS the front.
@@ -369,6 +389,9 @@ static void os_show_boot_pixels() {
             }
             clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next_frame, nullptr);
         }
+
+        close(fd);
+        return;
     }
 
     // We tried every connector and none were usable.
@@ -490,8 +513,11 @@ void os_loop() {
 
 int main(int argc, char* argv[]) {
     cout << "Welcome to Custom OS" << endl;
+    cout << "os: starting boot graphics" << endl;
 
     os_show_boot_pixels();
+
+    cout << "os: entering shell" << endl;
 
     os_loop();
 
