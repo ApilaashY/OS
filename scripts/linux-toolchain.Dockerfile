@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     flex \
     git \
     grub-common \
+    grub-pc-bin \
+    grub-efi-amd64-bin \
     libelf-dev \
     libncurses-dev \
     libssl-dev \

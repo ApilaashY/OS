@@ -1,2 +1,0 @@
-Kernel build completed with configuration but objtool compilation failed due to ARM64 vs x86 architecture incompatibility.
-This is expected behavior when building x86 kernels in ARM64 containers.

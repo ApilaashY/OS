@@ -1,144 +1,121 @@
 #!/usr/bin/env bash
-# Package the built shell + kernel into a hybrid UEFI-bootable ISO.
-#
-# The ISO can be flashed to a USB with balenaEtcher / Rufus (DD mode) /
-# `dd if=os.iso of=/dev/sdX bs=4M` and the resulting stick will UEFI-boot on
-# real x86_64 hardware. It also boots on legacy BIOS as a side effect of
-# grub-mkrescue producing a fully hybrid image.
-#
-# High-level layout inside the ISO:
-#   /boot/bzImage                  -- the Linux kernel
-#   /boot/initramfs.cpio.gz        -- our shell + its shared libraries
-#   /boot/grub/grub.cfg            -- config the bootloader executes
-#   /EFI/BOOT/BOOTX64.EFI          -- GRUB EFI application (added by mkrescue)
-#
-# grub-mkrescue also embeds a small FAT "EFI System Partition" and a hybrid
-# MBR/GPT so UEFI firmware finds the EFI app when the ISO is written to a USB.
-#
-# HOST-ONLY: This script does everything on the host machine (no Docker
-# required). All it needs is a working shell binary, kernel image, and a
-# handful of common Linux tools -- see the tool check below.
-#
-# REAL HARDWARE CAVEATS
-#   * The kernel must have CONFIG_DRM_SIMPLEDRM=y so /dev/dri/card0 appears
-#     from the UEFI framebuffer (build_kernel.sh enables this).
-#   * Secure Boot must be disabled in firmware (our GRUB image is unsigned).
-#   * Kernel command line uses console=tty0 so output goes to the physical
-#     screen instead of a serial port that won't exist.
-
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-$PWD}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/build-linux}"
-KERNEL_VERSION="${KERNEL_VERSION:-6.12.38}"
-KERNEL_IMAGE="${KERNEL_IMAGE:-$REPO_ROOT/linux-kernel/linux-${KERNEL_VERSION}/arch/x86_64/boot/bzImage}"
+KERNEL_BUILD_DIR="${KERNEL_BUILD_DIR:-$REPO_ROOT/build-kernel-linux-amd64}"
+KERNEL_IMAGE="${KERNEL_IMAGE:-$KERNEL_BUILD_DIR/arch/x86_64/boot/bzImage}"
+INITRAMFS_DIR="${INITRAMFS_DIR:-$REPO_ROOT/initramfs}"
 INITRAMFS_IMAGE="${INITRAMFS_IMAGE:-$REPO_ROOT/initramfs.cpio.gz}"
-ISO_IMAGE="${ISO_IMAGE:-$REPO_ROOT/os.iso}"
+ISO_ROOT="${ISO_ROOT:-$REPO_ROOT/build/iso-root}"
+ISO_OUTPUT="${ISO_OUTPUT:-$REPO_ROOT/build/os-live.iso}"
+KERNEL_CMDLINE="${KERNEL_CMDLINE:-console=tty0 console=ttyS0 rdinit=/init loglevel=7}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+DOCKER_IMAGE="${DOCKER_IMAGE:-os-linux-toolchain:24.04}"
+DOCKERFILE="${DOCKERFILE:-$REPO_ROOT/scripts/linux-toolchain.Dockerfile}"
 
-# ---- preflight ---------------------------------------------------------------
-if [[ ! -x "$BUILD_DIR/os" ]]; then
-    echo "Shell binary not found at $BUILD_DIR/os" >&2
-    echo "Build it first with: scripts/build_shell.sh" >&2
-    exit 1
-fi
+ensure_image() {
+  local image_platform
+  image_platform="$(docker image inspect "$DOCKER_IMAGE" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || true)"
 
-if [[ ! -f "$KERNEL_IMAGE" ]]; then
-    echo "Kernel image not found at $KERNEL_IMAGE" >&2
-    echo "Build the kernel first with scripts/build_kernel.sh" >&2
-    exit 1
-fi
-
-missing=()
-for tool in xorriso grub-mkrescue cpio gzip ldd awk find; do
-    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
-done
-if (( ${#missing[@]} > 0 )); then
-    echo "Missing host tools: ${missing[*]}" >&2
-    echo "Install them with: sudo apt install -y xorriso grub-common grub-efi-amd64-bin cpio" >&2
-    exit 1
-fi
-
-# ---- 1. Package the initramfs on the host -----------------------------------
-# We rebuild it every time so the ISO always reflects the current shell binary.
-# The layout inside the cpio archive is a tiny Linux userspace:
-#   /init          -- our shell (executed as PID 1 by the kernel)
-#   /bin/os        -- same binary, also on PATH
-#   /lib/...       -- shared libraries the ELF depends on (glibc, libstdc++...)
-#   /dev, /proc, /sys -- empty mount points
-echo "Packaging initramfs..."
-INITRAMFS_DIR="$(mktemp -d -t os-initramfs-XXXXXX)"
-trap 'rm -rf "$INITRAMFS_DIR"' EXIT
-
-mkdir -p "$INITRAMFS_DIR"/{bin,dev,proc,sys}
-cp "$BUILD_DIR/os" "$INITRAMFS_DIR/init"
-chmod +x "$INITRAMFS_DIR/init"
-cp "$BUILD_DIR/os" "$INITRAMFS_DIR/bin/os"
-chmod +x "$INITRAMFS_DIR/bin/os"
-
-# Copy every shared library ldd reports the binary needs, plus the dynamic
-# linker itself. Two ldd output shapes to handle:
-#   "libfoo.so => /path/to/libfoo.so (0x...)"    -- has =>, take field 3
-#   "/lib64/ld-linux-x86-64.so.2 (0x...)"        -- no =>, take field 1
-ldd "$BUILD_DIR/os" | awk '
-    /=>/          { if ($3 ~ /^\//) print $3 }
-    !/=>/ && $1 ~ /^\// { print $1 }
-' | sort -u | while read -r lib; do
-    dest="$INITRAMFS_DIR${lib}"
-    mkdir -p "$(dirname "$dest")"
-    cp "$lib" "$dest"
-done
-
-( cd "$INITRAMFS_DIR" && find . -print0 \
-    | cpio --null -o --format=newc 2>/dev/null \
-    | gzip -9 > "$INITRAMFS_IMAGE" )
-
-echo "  -> $INITRAMFS_IMAGE ($(du -h "$INITRAMFS_IMAGE" | cut -f1))"
-
-# ---- 2. Stage ISO contents on the host --------------------------------------
-STAGE="$(mktemp -d -t os-iso-XXXXXX)"
-trap 'rm -rf "$INITRAMFS_DIR" "$STAGE"' EXIT
-
-mkdir -p "$STAGE/boot/grub"
-cp "$KERNEL_IMAGE"    "$STAGE/boot/bzImage"
-cp "$INITRAMFS_IMAGE" "$STAGE/boot/initramfs.cpio.gz"
-
-# grub.cfg -- what the bootloader executes at boot time.
-#   set default=0     -> pick the first menu entry
-#   set timeout=1     -> wait 1 second before auto-booting
-#   console=tty0      -> kernel + shell I/O go to the physical screen
-#   rdinit=/init      -> use our shell as PID 1 from the initramfs
-cat > "$STAGE/boot/grub/grub.cfg" <<'GRUBCFG'
-set default=0
-set timeout=1
-
-insmod all_video
-
-menuentry "Custom OS" {
-    linux /boot/bzImage console=tty0 rdinit=/init
-    initrd /boot/initramfs.cpio.gz
+  if [[ "$image_platform" != "$DOCKER_PLATFORM" ]]; then
+    echo "Building Linux toolchain image..."
+    docker buildx build --load --platform "$DOCKER_PLATFORM" -t "$DOCKER_IMAGE" -f "$DOCKERFILE" "$REPO_ROOT"
+  fi
 }
-GRUBCFG
 
-# ---- 3. Assemble the hybrid ISO ---------------------------------------------
-# grub-mkrescue produces a single .iso that is simultaneously:
-#   * a valid ISO 9660 filesystem (mountable, browsable)
-#   * a UEFI boot medium (embedded FAT ESP with /EFI/BOOT/BOOTX64.EFI)
-#   * a legacy BIOS boot medium (embedded isohdpfx + El Torito catalog)
-#   * a hybrid MBR/GPT disk (Etcher/Rufus write it byte-for-byte to a USB and
-#     firmware still finds the ESP)
-echo "Building ISO with grub-mkrescue..."
-grub-mkrescue \
-    --compress=xz \
-    -o "$ISO_IMAGE" \
-    "$STAGE" \
-    -- \
-    -volid "CUSTOM_OS"
+package_initramfs() {
+  if [[ ! -x "$BUILD_DIR/os" ]]; then
+    echo "Shell binary not found at $BUILD_DIR/os" >&2
+    echo "Building it first with scripts/build_shell.sh" >&2
+    "$SCRIPT_DIR/build_shell.sh"
+  fi
 
-echo
-echo "ISO ready at: $ISO_IMAGE"
-ls -lh "$ISO_IMAGE"
-echo
-echo "Flash to a USB stick with balenaEtcher, Rufus (DD mode),"
-echo "or: sudo dd if=$ISO_IMAGE of=/dev/sdX bs=4M status=progress conv=fsync"
-echo
-echo "Boot the USB via your firmware's UEFI boot menu. Disable Secure Boot."
+  echo "Packaging initramfs for the bootable ISO..."
+  rm -rf "$INITRAMFS_DIR"
+  mkdir -p "$INITRAMFS_DIR"
+
+  docker run --rm \
+    --platform "$DOCKER_PLATFORM" \
+    -v "$REPO_ROOT:/work" \
+    -w /work \
+    "$DOCKER_IMAGE" \
+    bash -lc '
+      set -euo pipefail
+      rm -rf /work/initramfs
+      mkdir -p /work/initramfs/bin /work/initramfs/dev /work/initramfs/proc /work/initramfs/sys
+      mknod -m 600 /work/initramfs/dev/console c 5 1 2>/dev/null || true
+      mknod -m 666 /work/initramfs/dev/null c 1 3 2>/dev/null || true
+      mknod -m 666 /work/initramfs/dev/ttyS0 c 4 64 2>/dev/null || true
+      cp /work/build-linux/os /work/initramfs/init
+      chmod +x /work/initramfs/init
+      ldd /work/build-linux/os | awk "
+        /=> \/|\// {
+          for (i = 1; i <= NF; i++) {
+            if (\$i ~ /^\//) {
+              print \$i
+            }
+          }
+        }" | while read -r lib; do
+          dest="/work/initramfs${lib}"
+          mkdir -p "$(dirname "$dest")"
+          cp "$lib" "$dest"
+        done
+      cp /work/build-linux/os /work/initramfs/bin/os
+      chmod +x /work/initramfs/bin/os
+      ( cd /work/initramfs && find . -print0 | cpio --null -ov --format=newc | gzip -9 > /work/initramfs.cpio.gz )
+    '
+}
+
+build_iso() {
+  if [[ ! -f "$KERNEL_IMAGE" ]]; then
+    echo "Kernel image not found at $KERNEL_IMAGE" >&2
+    echo "Building it first with scripts/build_kernel.sh" >&2
+    "$SCRIPT_DIR/build_kernel.sh"
+  fi
+
+  if [[ ! -f "$INITRAMFS_IMAGE" ]]; then
+    package_initramfs
+  fi
+
+  rm -rf "$ISO_ROOT"
+  mkdir -p "$ISO_ROOT/boot/grub"
+  mkdir -p "$(dirname "$ISO_OUTPUT")"
+
+  cp "$KERNEL_IMAGE" "$ISO_ROOT/boot/vmlinuz"
+  cp "$INITRAMFS_IMAGE" "$ISO_ROOT/boot/initrd.img"
+
+  cat > "$ISO_ROOT/boot/grub/grub.cfg" <<EOF
+set timeout=5
+set default=0
+
+menuentry "os" {
+  linux /boot/vmlinuz $KERNEL_CMDLINE
+  initrd /boot/initrd.img
+}
+EOF
+
+  echo "Creating bootable ISO at $ISO_OUTPUT"
+  docker run --rm \
+    --platform "$DOCKER_PLATFORM" \
+    -v "$REPO_ROOT:/work" \
+    -w /work \
+    "$DOCKER_IMAGE" \
+    bash -lc "set -euo pipefail; grub-mkrescue -o /work/build/os-live.iso /work/build/iso-root"
+
+  if [[ -f "$ISO_OUTPUT" ]]; then
+    echo "ISO image ready: $ISO_OUTPUT"
+  else
+    echo "ISO image was not produced at $ISO_OUTPUT" >&2
+    exit 1
+  fi
+}
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is required to build the ISO image from this host setup." >&2
+  exit 1
+fi
+
+ensure_image
+build_iso
