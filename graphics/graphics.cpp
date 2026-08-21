@@ -398,6 +398,14 @@ void Graphics::animate() {
     }
 }
 
+uint32_t Graphics::width() const {
+    return mode.hdisplay;
+}
+
+uint32_t Graphics::height() const {
+    return mode.vdisplay;
+}
+
 void Graphics::drawRectBuffer(Point x, Point y, uint32_t color) {
     Buf& b = bufs[back];
 

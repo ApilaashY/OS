@@ -1,6 +1,7 @@
 #include <string>
 #include <iostream>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 #include <cstring>
 #include <fcntl.h>
@@ -13,6 +14,8 @@
 #include "string_helpers/string_helpers.h"
 #include "graphics/graphics.h"
 #include "component/Desktop/Desktop.h"
+#include "component/box/box.h"
+#include "mouse/mouse.h"
 
 
 using namespace std;
@@ -133,18 +136,53 @@ int main(int argc, char* argv[]) {
     cout << "Welcome to Custom OS" << endl;
     cout << "os: starting boot graphics" << endl;
 
-    Graphics g{800, 600, 0x00FFFFFF};
+    Graphics* g = new Graphics(800, 600, 0xFFFFFFFF);
 
-    g.drawRectBuffer({0, 0}, {200, 200}, 0x00FF00FF);
-    g.drawScreen();
+    g->drawRectBuffer({0, 0}, {200, 200}, 0xFFFF00FF);
+    g->drawScreen();
 
-    Desktop* desktop = new Desktop({0, 0}, {800, 600}, 0x00FFFFFF);
-    g.addComponent(desktop);
-    g.drawComponents();
+    Desktop* desktop = new Desktop({0, 0}, {800, 600}, 0xFFFFFFFF, *g);
+    g->addComponent(dynamic_cast<Component*>(desktop));
+    g->drawComponents();
+
+
+    Box* box1 = new Box({100, 100}, {300, 300}, 0xFF00FF00);
+    desktop->addComponent(dynamic_cast<Component*>(box1));
+    g->drawComponents();
+
+    // for (int i = 0; i<100; i++) {
+    //     box1->move({10, 2});
+    //     g->drawComponents();
+    // }
+
+    Mouse* mouse = new Mouse(desktop, 800, 600);
+    mouse->setViewportSize(g->width(), g->height());
+
+    while (true) {
+        try {
+            mouse->readMouse();
+            break;
+        } catch (const std::exception &e) {
+            std::cerr << "Exception caught while reading mouse: " << e.what() << std::endl;
+            // Wait
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
+
+
+    while (true) {
+        mouse->readMouse();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     cout << "os: entering shell" << endl;
 
     os_loop();
+
+    delete desktop;
+    delete box1;
+    delete mouse;
 
     return 0; //EXIT_STATUS;
 }

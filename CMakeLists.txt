@@ -37,6 +37,20 @@ add_library(desktop
 target_include_directories(desktop PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/component/desktop)
 target_compile_features(desktop PUBLIC cxx_std_23)
 
+# --- box module ---
+add_library(box
+    component/box/box.cpp
+)
+target_include_directories(box PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/component/box)
+target_compile_features(box PUBLIC cxx_std_23)
+
+# --- mouse module ---
+add_library(mouse
+    mouse/mouse.cpp
+)
+target_include_directories(mouse PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/mouse)
+target_compile_features(mouse PUBLIC cxx_std_23)
+
 # --- graphics module ---
 add_library(graphics
     graphics/graphics.cpp
@@ -48,4 +62,4 @@ target_link_libraries(graphics PUBLIC point component)
 # --- main executable ---
 add_executable(os main.cpp)
 target_compile_features(os PRIVATE cxx_std_23)
-target_link_libraries(os PRIVATE string_helpers graphics desktop)
+target_link_libraries(os PRIVATE string_helpers graphics desktop box mouse)

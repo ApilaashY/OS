@@ -14,6 +14,7 @@ QEMU_BIN="${QEMU_BIN:-qemu-system-x86_64}"
 KERNEL_CMDLINE="${KERNEL_CMDLINE:-console=tty0 console=ttyS0 rdinit=/init loglevel=7}"
 QEMU_HEADLESS="${QEMU_HEADLESS:-0}"
 QEMU_DAEMONIZE="${QEMU_DAEMONIZE:-0}"
+QEMU_MOUSE_DEVICE="${QEMU_MOUSE_DEVICE:-usb-tablet}"
 QEMU_SERIAL_LOG="${QEMU_SERIAL_LOG:-$REPO_ROOT/qemu-serial.log}"
 QEMU_PIDFILE="${QEMU_PIDFILE:-$REPO_ROOT/qemu.pid}"
 KILL_STALE_QEMU="${KILL_STALE_QEMU:-1}"
@@ -105,6 +106,8 @@ if [[ "$QEMU_DAEMONIZE" == "1" ]]; then
     -serial "file:$QEMU_SERIAL_LOG" \
     -pidfile "$QEMU_PIDFILE" \
     -daemonize \
+    -usb \
+    -device "$QEMU_MOUSE_DEVICE" \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS_IMAGE" \
     -append "$KERNEL_CMDLINE"
@@ -118,6 +121,8 @@ elif [[ "$QEMU_HEADLESS" == "1" ]]; then
     -nographic \
     -monitor none \
     -serial stdio \
+    -usb \
+    -device "$QEMU_MOUSE_DEVICE" \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS_IMAGE" \
     -append "$KERNEL_CMDLINE"
@@ -126,6 +131,8 @@ else
     -m 512M \
     -vga std \
     -serial mon:stdio \
+    -usb \
+    -device "$QEMU_MOUSE_DEVICE" \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS_IMAGE" \
     -append "$KERNEL_CMDLINE"

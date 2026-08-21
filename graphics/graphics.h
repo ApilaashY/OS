@@ -15,13 +15,15 @@ struct Buf {
 
 class Graphics {
 public:
-    Graphics(uint32_t width = 800, uint32_t height = 600, uint32_t background_color = 0x00000000);
+    Graphics(uint32_t width = 800, uint32_t height = 600, uint32_t background_color = 0xFF000000);
     void animate();
     void clearBuffer();
     void drawRectBuffer(Point x, Point y, uint32_t color);
     void drawScreen();
     Component* addComponent(Component* component);
     void drawComponents();
+    uint32_t width() const;
+    uint32_t height() const;
 
 private:
     std::vector<uint32_t> connector_ids;
