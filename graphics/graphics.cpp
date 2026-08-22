@@ -1,5 +1,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
+#include <algorithm>
 #include <vector>
 #include <cstdint>
 #include <cstring>
@@ -408,15 +409,27 @@ uint32_t Graphics::height() const {
 
 void Graphics::drawRectBuffer(Point x, Point y, uint32_t color) {
     Buf& b = bufs[back];
+    if (!b.pixels) return;
 
     uint8_t* base = static_cast<uint8_t*>(b.pixels);
 
-    for (int i = x.y; i<y.y; i++) {
-        for (int j = x.x; j<y.x; j++) {
-            uint32_t* row = reinterpret_cast<uint32_t*>(base + (i) * b.pitch);
+    // Clip to the framebuffer so off-screen rects (e.g. an off-screen mouse
+    // sentinel) don't walk past the mmap and segfault init.
+    const int y_start = std::max(0, x.y);
+    const int y_end   = std::min<int>(mode.vdisplay, y.y);
+    const int x_start = std::max(0, x.x);
+    const int x_end   = std::min<int>(mode.hdisplay, y.x);
+
+    for (int i = y_start; i < y_end; i++) {
+        uint32_t* row = reinterpret_cast<uint32_t*>(base + i * b.pitch);
+        for (int j = x_start; j < x_end; j++) {
             row[j] = color;
         }
     }
+}
+
+void Graphics::drawRectBuffer(ScreenArea area, uint32_t color) {
+    drawRectBuffer(area.topLeft, area.bottomRight, color);
 }
 
 void Graphics::drawScreen() {
@@ -488,22 +501,10 @@ void Graphics::clearBuffer() {
     memset(b.pixels, background_color, b.size);
 }
 
-Component* Graphics::addComponent(Component* component) {
-    components.push_back(component);
-    return component;
-}
-
-void Graphics::drawComponents() {
-    clearBuffer();
-    for (Component* component : components) {
-        for (int i = 0; i < mode.vdisplay; i++) {
-            for (int j = 0; j < mode.hdisplay; j++) {
-                uint32_t color = component->colorAt({j, i}, mode.hdisplay, mode.vdisplay);
-                if (color != 0xFFFFFFFF) {
-                    drawRectBuffer({j, i}, {j+1, i+1}, color);
-                }
-            }
-        }
-    }
-    drawScreen();
+void Graphics::copyBuffer() {
+    Buf& dst = bufs[back];
+    Buf& src = bufs[back ^ 1];
+    if (!dst.pixels || !src.pixels) return;
+    if (dst.size != src.size) return;
+    memcpy(dst.pixels, src.pixels, dst.size);
 }

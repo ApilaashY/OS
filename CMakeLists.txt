@@ -30,11 +30,32 @@ add_library(component
 target_include_directories(component PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/component)
 target_compile_features(component PUBLIC cxx_std_23)
 
+# --- screen module ---
+add_library(screen
+    component/screen/screen.cpp
+)
+target_include_directories(screen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/component/screen)
+target_compile_features(screen PUBLIC cxx_std_23)
+
+# --- application module ---
+add_library(application
+    application/application.cpp
+)
+target_include_directories(application PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/application)
+target_compile_features(application PUBLIC cxx_std_23)
+
+# --- window module ---
+add_library(window
+    window/window.cpp
+)
+target_include_directories(window PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/window)
+target_compile_features(window PUBLIC cxx_std_23)
+
 # --- desktop module ---
 add_library(desktop
-    component/desktop/desktop.cpp
+    desktop/desktop.cpp
 )
-target_include_directories(desktop PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/component/desktop)
+target_include_directories(desktop PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/desktop)
 target_compile_features(desktop PUBLIC cxx_std_23)
 
 # --- box module ---
@@ -57,7 +78,7 @@ add_library(graphics
 )
 target_include_directories(graphics PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/graphics)
 target_compile_features(graphics PUBLIC cxx_std_23)
-target_link_libraries(graphics PUBLIC point component)
+target_link_libraries(graphics PUBLIC point component window)
 
 # --- main executable ---
 add_executable(os main.cpp)

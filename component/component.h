@@ -11,4 +11,5 @@ public:
     virtual ~Component() = default;
     virtual uint32_t colorAt(Point p, int width, int height) const = 0;
     void move(Point move);
+    ScreenArea getScreenArea() const;
 };

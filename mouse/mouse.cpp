@@ -17,8 +17,9 @@ namespace {
 // Try to open a Linux input device that represents a mouse.
 // In modern Linux systems this is usually /dev/input/eventX.
 int openMouseDevice() {
+    // /dev/input/mice speaks the legacy PS/2 3-byte protocol via mousedev, not
+    // evdev input_event structs, so it's useless to our reader. Only probe evdev.
     static constexpr const char* candidates[] = {
-        "/dev/input/mice",
         "/dev/input/event0",
         "/dev/input/event1",
         "/dev/input/event2",
@@ -40,6 +41,8 @@ int openMouseDevice() {
 
     int best_fd = -1;
     int best_score = -1;
+    std::string best_path;
+    std::string best_name;
 
     for (const char* const* path = candidates; *path != nullptr; ++path) {
         std::cout << "[mouse] probing " << *path << std::endl;
@@ -75,16 +78,22 @@ int openMouseDevice() {
             score -= 5;
         }
 
+        std::cout << "[mouse] candidate " << *path << " score=" << score << std::endl;
+
         if (score > best_score) {
+            if (best_fd >= 0) close(best_fd);
             best_score = score;
             best_fd = candidate_fd;
+            best_path = *path;
+            best_name = name;
         } else {
             close(candidate_fd);
         }
     }
 
     if (best_fd >= 0) {
-        std::cout << "[mouse] selected fd " << best_fd << std::endl;
+        std::cout << "[mouse] selected " << best_path << " (" << best_name
+                  << ") fd=" << best_fd << " score=" << best_score << std::endl;
         return best_fd;
     }
 
@@ -131,6 +140,14 @@ void Mouse::readMouse() {
         throw std::runtime_error("Failed to poll mouse input event");
     }
     if (ready == 0) {
+        // USB devices enumerate a few seconds into boot. If we latched onto an
+        // early PS/2 stub that never produces events, drop it and re-probe so a
+        // later-appearing tablet/mouse can win the scoring pass.
+        if (!received_event) {
+            std::cout << "[mouse] no events yet on fd " << fd << "; re-probing" << std::endl;
+            close(fd);
+            fd = -1;
+        }
         return;
     }
 
@@ -149,9 +166,11 @@ void Mouse::readMouse() {
             break;
         }
 
-        std::cout << "[mouse] event type=" << event.type
-                  << " code=" << event.code
-                  << " value=" << event.value << std::endl;
+        // std::cout << "[mouse] event type=" << event.type
+        //           << " code=" << event.code
+        //           << " value=" << event.value << std::endl;
+
+        received_event = true;
 
         if (event.type == EV_REL) {
             if (event.code == REL_X) {
@@ -170,8 +189,8 @@ void Mouse::readMouse() {
         }
     }
 
-    std::cout << "mouse: x=" << x_position << " y=" << y_position
-              << " left=" << left_button << " right=" << right_button << '\n';
+    // std::cout << "mouse: x=" << x_position << " y=" << y_position
+    //           << " left=" << left_button << " right=" << right_button << '\n';
 
     desktop->drawMouse({x_position, y_position});
 }

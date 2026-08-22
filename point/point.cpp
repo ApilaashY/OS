@@ -15,3 +15,17 @@ Point operator+(const int& a, const Point& b) {
 Point operator-(const Point& a) {
     return Point(-a.x, -a.y);
 }
+
+Point operator-(const Point& a, const int& b) {
+    return Point(a.x - b, a.y - b);
+}
+
+
+Point operator-(const int& a, const Point& b) {
+    return Point(a - b.x, a - b.y);
+}
+
+bool ScreenArea::overlaps(const ScreenArea& other) const {
+    return !(bottomRight.x < other.topLeft.x || topLeft.x > other.bottomRight.x ||
+             bottomRight.y < other.topLeft.y || topLeft.y > other.bottomRight.y);
+}

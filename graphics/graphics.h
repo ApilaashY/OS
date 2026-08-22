@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../component/component.h"
+#include "../window/window.h"
 #include <cstdint>
 #include <vector>
 #include <drm/drm_mode.h>
@@ -18,10 +19,10 @@ public:
     Graphics(uint32_t width = 800, uint32_t height = 600, uint32_t background_color = 0xFF000000);
     void animate();
     void clearBuffer();
+    void copyBuffer();
     void drawRectBuffer(Point x, Point y, uint32_t color);
+    void drawRectBuffer(ScreenArea area, uint32_t color);
     void drawScreen();
-    Component* addComponent(Component* component);
-    void drawComponents();
     uint32_t width() const;
     uint32_t height() const;
 
@@ -34,6 +35,4 @@ private:
     uint32_t crtc_id = 0;
     int back = 1;
     uint32_t background_color;
-
-    std::vector<Component*> components;
 };

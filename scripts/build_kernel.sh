@@ -15,13 +15,30 @@ DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-os-linux-toolchain:24.04}"
 DOCKERFILE="${DOCKERFILE:-$REPO_ROOT/scripts/linux-toolchain.Dockerfile}"
 
+proxy_build_args() {
+  # Forward proxy env vars into the build only when set on the host.
+  local http_val="${http_proxy:-${HTTP_PROXY:-}}"
+  local https_val="${https_proxy:-${HTTPS_PROXY:-$http_val}}"
+  local no_val="${no_proxy:-${NO_PROXY:-}}"
+  local args=()
+  [[ -n "$http_val" ]]  && args+=(--build-arg "http_proxy=$http_val")
+  [[ -n "$https_val" ]] && args+=(--build-arg "https_proxy=$https_val")
+  [[ -n "$no_val" ]]    && args+=(--build-arg "no_proxy=$no_val")
+  printf '%s\n' "${args[@]}"
+}
+
 ensure_image() {
   local image_platform
   image_platform="$(docker image inspect "$DOCKER_IMAGE" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || true)"
 
   if [[ "$image_platform" != "$DOCKER_PLATFORM" ]]; then
     echo "Building Linux toolchain image..."
-    docker buildx build --load --platform "$DOCKER_PLATFORM" -t "$DOCKER_IMAGE" -f "$DOCKERFILE" "$REPO_ROOT"
+    local build_args=()
+    mapfile -t build_args < <(proxy_build_args)
+    if (( ${#build_args[@]} )); then
+      echo "Forwarding host proxy settings into image build."
+    fi
+    docker buildx build --load --platform "$DOCKER_PLATFORM" "${build_args[@]}" -t "$DOCKER_IMAGE" -f "$DOCKERFILE" "$REPO_ROOT"
 
     image_platform="$(docker image inspect "$DOCKER_IMAGE" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || true)"
     if [[ "$image_platform" != "$DOCKER_PLATFORM" ]]; then

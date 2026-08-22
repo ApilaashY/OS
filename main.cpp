@@ -13,7 +13,7 @@
 
 #include "string_helpers/string_helpers.h"
 #include "graphics/graphics.h"
-#include "component/Desktop/Desktop.h"
+#include "desktop/desktop.h"
 #include "component/box/box.h"
 #include "mouse/mouse.h"
 
@@ -136,24 +136,15 @@ int main(int argc, char* argv[]) {
     cout << "Welcome to Custom OS" << endl;
     cout << "os: starting boot graphics" << endl;
 
-    Graphics* g = new Graphics(800, 600, 0xFFFFFFFF);
+    const auto background = 0xFF00000F;
 
-    g->drawRectBuffer({0, 0}, {200, 200}, 0xFFFF00FF);
-    g->drawScreen();
+    Graphics* g = new Graphics(800, 600, background);
 
-    Desktop* desktop = new Desktop({0, 0}, {800, 600}, 0xFFFFFFFF, *g);
-    g->addComponent(dynamic_cast<Component*>(desktop));
-    g->drawComponents();
+    Desktop* desktop = new Desktop(g->width(), g->height(), background, g);
 
 
-    Box* box1 = new Box({100, 100}, {300, 300}, 0xFF00FF00);
-    desktop->addComponent(dynamic_cast<Component*>(box1));
-    g->drawComponents();
-
-    // for (int i = 0; i<100; i++) {
-    //     box1->move({10, 2});
-    //     g->drawComponents();
-    // }
+    Window* box1 = new Window({100, 100}, {300, 300});
+    desktop->addWindow(dynamic_cast<Window*>(box1));
 
     Mouse* mouse = new Mouse(desktop, 800, 600);
     mouse->setViewportSize(g->width(), g->height());
@@ -173,7 +164,7 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         mouse->readMouse();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     cout << "os: entering shell" << endl;

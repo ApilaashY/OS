@@ -6,3 +6,7 @@ void Component::move(Point move) {
     y.x += move.x;
     y.y += move.y;
 }
+
+ScreenArea Component::getScreenArea() const {
+    return ScreenArea(x, y);
+}

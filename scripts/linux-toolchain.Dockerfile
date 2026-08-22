@@ -2,6 +2,11 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Optional HTTP(S) proxy for apt during build; not persisted in the final image.
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+
 # Install common packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bc \

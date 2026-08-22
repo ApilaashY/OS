@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../component/desktop/desktop.h"
+#include "../desktop/desktop.h"
 
 class Mouse {
     Desktop* desktop;
@@ -15,6 +15,7 @@ class Mouse {
     int y_max = 65535;
     bool left_button = false;
     bool right_button = false;
+    bool received_event = false;
 
 public:
     explicit Mouse(Desktop* desktop, int viewport_width = 800, int viewport_height = 600)
