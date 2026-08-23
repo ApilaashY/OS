@@ -15,6 +15,7 @@ KERNEL_CMDLINE="${KERNEL_CMDLINE:-console=tty0 console=ttyS0 rdinit=/init loglev
 QEMU_HEADLESS="${QEMU_HEADLESS:-0}"
 QEMU_DAEMONIZE="${QEMU_DAEMONIZE:-0}"
 QEMU_MOUSE_DEVICE="${QEMU_MOUSE_DEVICE:-usb-tablet}"
+QEMU_DISPLAY_RES="${QEMU_DISPLAY_RES:-1920x1080}"
 QEMU_SERIAL_LOG="${QEMU_SERIAL_LOG:-$REPO_ROOT/qemu-serial.log}"
 QEMU_PIDFILE="${QEMU_PIDFILE:-$REPO_ROOT/qemu.pid}"
 KILL_STALE_QEMU="${KILL_STALE_QEMU:-1}"
@@ -157,7 +158,8 @@ elif [[ "$QEMU_HEADLESS" == "1" ]]; then
 else
   exec "$QEMU_BIN" \
     -m 512M \
-    -vga std \
+    -vga none \
+    -device "VGA,xres=${QEMU_DISPLAY_RES%x*},yres=${QEMU_DISPLAY_RES#*x}" \
     -serial mon:stdio \
     -usb \
     -device "$QEMU_MOUSE_DEVICE" \
