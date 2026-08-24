@@ -14,6 +14,7 @@ KERNEL_CMDLINE="${KERNEL_CMDLINE:-console=tty0 console=ttyS0 rdinit=/init loglev
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-os-linux-toolchain:24.04}"
 DOCKERFILE="${DOCKERFILE:-$REPO_ROOT/scripts/linux-toolchain.Dockerfile}"
+KEYS_DIR="${KEYS_DIR:-$REPO_ROOT/keys/secureboot}"
 
 ensure_image() {
   local image_platform
@@ -80,15 +81,12 @@ build_iso() {
   fi
 
   rm -rf "$ISO_ROOT"
-  mkdir -p "$ISO_ROOT/boot/grub"
-  mkdir -p "$(dirname "$ISO_OUTPUT")"
+  mkdir -p "$ISO_ROOT" "$KEYS_DIR" "$(dirname "$ISO_OUTPUT")"
 
-  cp "$KERNEL_IMAGE" "$ISO_ROOT/boot/vmlinuz"
-  cp "$INITRAMFS_IMAGE" "$ISO_ROOT/boot/initrd.img"
-
-  cat > "$ISO_ROOT/boot/grub/grub.cfg" <<EOF
+  cat > "$REPO_ROOT/build/grub.cfg" <<EOF
 set timeout=5
 set default=0
+search --no-floppy --set=root --file /boot/vmlinuz
 
 menuentry "os" {
   linux /boot/vmlinuz $KERNEL_CMDLINE
@@ -96,16 +94,71 @@ menuentry "os" {
 }
 EOF
 
-  echo "Creating bootable ISO at $ISO_OUTPUT"
+  echo "Creating Secure Boot bootable ISO at $ISO_OUTPUT"
   docker run --rm \
     --platform "$DOCKER_PLATFORM" \
     -v "$REPO_ROOT:/work" \
     -w /work \
     "$DOCKER_IMAGE" \
-    bash -lc "set -euo pipefail; grub-mkrescue -o /work/build/os-live.iso /work/build/iso-root"
+    bash -lc '
+      set -euo pipefail
+
+      KEY=/work/keys/secureboot/MOK.key
+      CRT=/work/keys/secureboot/MOK.crt
+      DER=/work/keys/secureboot/MOK.der
+
+      if [[ ! -f "$KEY" || ! -f "$CRT" ]]; then
+        echo "Generating persistent Secure Boot signing key/certificate..."
+        openssl req -x509 -newkey rsa:2048 -keyout "$KEY" -out "$CRT" \
+          -nodes -days 3650 -subj "/CN=os-live Secure Boot Signing/"
+        chmod 600 "$KEY"
+      fi
+      openssl x509 -in "$CRT" -outform DER -out "$DER"
+
+      rm -rf /work/build/esp
+      mkdir -p /work/build/esp/EFI/BOOT /work/build/esp/boot/grub /work/build/esp/boot
+
+      # shim is trusted by standard UEFI Secure Boot databases and launches
+      # Canonical-signed GRUB, which validates the MOK-signed kernel.
+      cp /usr/lib/shim/shimx64.efi.signed.latest /work/build/esp/EFI/BOOT/BOOTX64.EFI
+      cp /usr/lib/shim/mmx64.efi /work/build/esp/EFI/BOOT/mmx64.efi
+      cp /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed /work/build/esp/EFI/BOOT/grubx64.efi
+      cp /work/build/grub.cfg /work/build/esp/boot/grub/grub.cfg
+      sbsign --key "$KEY" --cert "$CRT" \
+        --output /work/build/esp/boot/vmlinuz /work/build-kernel-linux-amd64/arch/x86_64/boot/bzImage
+      cp /work/initramfs.cpio.gz /work/build/esp/boot/initrd.img
+      cp "$DER" /work/build/esp/MOK.der
+
+      content_kb=$(du -sk /work/build/esp | cut -f1)
+      img_kb=$((content_kb + 8192))
+      rm -f /work/build/efiboot.img
+      dd if=/dev/zero of=/work/build/efiboot.img bs=1024 count="$img_kb" status=none
+      mkfs.vfat -n OS_ESP /work/build/efiboot.img >/dev/null
+
+      mmd -i /work/build/efiboot.img ::EFI ::EFI/BOOT ::boot ::boot/grub
+      mcopy -i /work/build/efiboot.img /work/build/esp/EFI/BOOT/BOOTX64.EFI ::EFI/BOOT/BOOTX64.EFI
+      mcopy -i /work/build/efiboot.img /work/build/esp/EFI/BOOT/mmx64.efi ::EFI/BOOT/mmx64.efi
+      mcopy -i /work/build/efiboot.img /work/build/esp/EFI/BOOT/grubx64.efi ::EFI/BOOT/grubx64.efi
+      mcopy -i /work/build/efiboot.img /work/build/esp/boot/grub/grub.cfg ::boot/grub/grub.cfg
+      mcopy -i /work/build/efiboot.img /work/build/esp/boot/vmlinuz ::boot/vmlinuz
+      mcopy -i /work/build/efiboot.img /work/build/esp/boot/initrd.img ::boot/initrd.img
+      mcopy -i /work/build/efiboot.img /work/build/esp/MOK.der ::MOK.der
+
+      cp "$DER" /work/build/iso-root/MOK.der
+      xorriso -as mkisofs \
+        -V OS_LIVE \
+        -o /work/build/os-live.iso \
+        -partition_offset 16 \
+        -c boot.catalog \
+        -append_partition 2 0xef /work/build/efiboot.img \
+        -no-emul-boot \
+        -e --interval:appended_partition_2:all:: \
+        /work/build/iso-root
+    '
 
   if [[ -f "$ISO_OUTPUT" ]]; then
     echo "ISO image ready: $ISO_OUTPUT"
+    echo "Enroll once without BIOS: $SCRIPT_DIR/enroll_secureboot_key.sh"
   else
     echo "ISO image was not produced at $ISO_OUTPUT" >&2
     exit 1

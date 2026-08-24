@@ -25,3 +25,6 @@ lib/
 *.DS_Store
 linux-kernel/
 *.gz
+
+# Secure Boot signing key (private, must never be committed)
+keys/

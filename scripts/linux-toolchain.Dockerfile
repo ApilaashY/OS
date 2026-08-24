@@ -26,16 +26,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     grub-common \
     grub-pc-bin \
     grub-efi-amd64-bin \
+        grub-efi-amd64-signed \
     libelf-dev \
     libncurses-dev \
     libssl-dev \
     lld \
     mtools \
     ninja-build \
+        openssl \
     perl \
     pkg-config \
     python3 \
     rsync \
+        sbsigntool \
+        shim-signed \
     xorriso \
     xz-utils \
  && rm -rf /var/lib/apt/lists/*

@@ -43,6 +43,27 @@ To create a bootable ISO image that can be flashed to a USB drive with tools suc
 
 This produces an ISO at `build/os-live.iso` that boots the kernel and initramfs with GRUB.
 
+### Secure Boot enrollment
+
+The ISO uses Microsoft-signed shim and Canonical-signed GRUB, so it works with
+standard UEFI Secure Boot and does not require changing BIOS settings. The
+project's kernel is signed with a local Machine Owner Key (MOK), which needs a
+single enrollment from the Linux system you build on:
+
+1. Build the ISO with `./scripts/build_iso.sh`. This generates the persistent
+    key and certificate under `keys/secureboot/`; do not delete or share
+    `MOK.key`.
+2. Run `./scripts/enroll_secureboot_key.sh` on the machine where you will boot
+    the USB. It asks for a temporary enrollment password.
+3. Reboot directly from the USB. MokManager appears before the OS starts.
+    Choose **Enroll MOK**, then **Continue**, **Yes**, and enter the temporary
+    password. It reboots automatically.
+4. Boot the USB again. The MOK is now stored in the machine's Secure Boot
+    database, so all future ISOs built with this same key boot normally.
+
+This one-time enrollment is required by Secure Boot; it is the authorization
+that lets the firmware trust your own kernel without disabling Secure Boot.
+
 ### Helper scripts
 
 - `scripts/fetch_kernel.sh` downloads and extracts a Linux kernel source tree.
