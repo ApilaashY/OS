@@ -160,12 +160,18 @@ int main(int argc, char* argv[]) {
         }
     }
 
-
-
-    while (true) {
-        mouse->readMouse();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
+    // Poll the mouse on a background thread so the shell below isn't blocked forever.
+    std::thread mouseThread([mouse]() {
+        while (true) {
+            try {
+                mouse->readMouse();
+            } catch (const std::exception &e) {
+                std::cerr << "Exception caught while reading mouse: " << e.what() << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        }
+    });
+    mouseThread.detach();
 
     cout << "os: entering shell" << endl;
 
