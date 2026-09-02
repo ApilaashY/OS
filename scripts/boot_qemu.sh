@@ -15,7 +15,7 @@ KERNEL_CMDLINE="${KERNEL_CMDLINE:-console=tty0 console=ttyS0 rdinit=/init loglev
 QEMU_HEADLESS="${QEMU_HEADLESS:-0}"
 QEMU_DAEMONIZE="${QEMU_DAEMONIZE:-0}"
 QEMU_MOUSE_DEVICE="${QEMU_MOUSE_DEVICE:-usb-tablet}"
-QEMU_DISPLAY_RES="${QEMU_DISPLAY_RES:-1920x1080}"
+QEMU_DISPLAY_RES="${QEMU_DISPLAY_RES:-800x600}"
 QEMU_SERIAL_LOG="${QEMU_SERIAL_LOG:-$REPO_ROOT/qemu-serial.log}"
 QEMU_PIDFILE="${QEMU_PIDFILE:-$REPO_ROOT/qemu.pid}"
 KILL_STALE_QEMU="${KILL_STALE_QEMU:-1}"
@@ -90,8 +90,8 @@ if [[ "$KILL_STALE_QEMU" == "1" ]]; then
   fi
 fi
 
-rm -rf "$INITRAMFS_DIR"
-mkdir -p "$INITRAMFS_DIR"
+mkdir -p "$(dirname "$INITRAMFS_IMAGE")"
+INITRAMFS_TMP="${INITRAMFS_IMAGE}.tmp.$$"
 
 echo "Packaging initramfs inside Linux container..."
 docker run --rm \
@@ -101,13 +101,14 @@ docker run --rm \
   "$DOCKER_IMAGE" \
   bash -lc '
     set -euo pipefail
-    rm -rf /work/initramfs
-    mkdir -p /work/initramfs/bin /work/initramfs/dev /work/initramfs/proc /work/initramfs/sys
-    mknod -m 600 /work/initramfs/dev/console c 5 1 2>/dev/null || true
-    mknod -m 666 /work/initramfs/dev/null c 1 3 2>/dev/null || true
-    mknod -m 666 /work/initramfs/dev/ttyS0 c 4 64 2>/dev/null || true
-    cp /work/build-linux/os /work/initramfs/init
-    chmod +x /work/initramfs/init
+    initramfs_dir=/tmp/initramfs
+    rm -rf "$initramfs_dir"
+    mkdir -p "$initramfs_dir/bin" "$initramfs_dir/dev" "$initramfs_dir/proc" "$initramfs_dir/sys"
+    mknod -m 600 "$initramfs_dir/dev/console" c 5 1
+    mknod -m 666 "$initramfs_dir/dev/null" c 1 3
+    mknod -m 666 "$initramfs_dir/dev/ttyS0" c 4 64
+    cp /work/build-linux/os "$initramfs_dir/init"
+    chmod +x "$initramfs_dir/init"
     ldd /work/build-linux/os | awk "
       /=> \\/|\\// {
         for (i = 1; i <= NF; i++) {
@@ -116,14 +117,15 @@ docker run --rm \
           }
         }
       }" | while read -r lib; do
-        dest="/work/initramfs${lib}"
+        dest="$initramfs_dir${lib}"
         mkdir -p "$(dirname "$dest")"
         cp "$lib" "$dest"
       done
-    cp /work/build-linux/os /work/initramfs/bin/os
-    chmod +x /work/initramfs/bin/os
-    ( cd /work/initramfs && find . -print0 | cpio --null -ov --format=newc | gzip -9 > /work/initramfs.cpio.gz )
-  '
+    cp /work/build-linux/os "$initramfs_dir/bin/os"
+    chmod +x "$initramfs_dir/bin/os"
+    ( cd "$initramfs_dir" && find . -print0 | cpio --null -ov --format=newc | gzip -9 )
+  ' > "$INITRAMFS_TMP"
+mv -f "$INITRAMFS_TMP" "$INITRAMFS_IMAGE"
 
 echo "Booting QEMU..."
 if [[ "$QEMU_DAEMONIZE" == "1" ]]; then

@@ -44,9 +44,22 @@ ensure_image
 
 mkdir -p "$BUILD_DIR"
 
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
+
+# Earlier builds may have created generated files as root. Docker cannot always
+# remap those files on the host, so retain them for inspection and start fresh.
+if [[ -e "$BUILD_DIR/CMakeFiles/cmake.check_cache" && ! -w "$BUILD_DIR/CMakeFiles/cmake.check_cache" ]]; then
+  STALE_BUILD_DIR="${BUILD_DIR}.unwritable.$(date +%Y%m%d%H%M%S)"
+  echo "Archiving unwritable build directory to: $STALE_BUILD_DIR"
+  mv "$BUILD_DIR" "$STALE_BUILD_DIR"
+  mkdir -p "$BUILD_DIR"
+fi
+
 echo "Building shell inside Linux container..."
 docker run --rm \
   --platform "$DOCKER_PLATFORM" \
+  --user "$HOST_UID:$HOST_GID" \
   -v "$REPO_ROOT:/work" \
   -w /work \
   "$DOCKER_IMAGE" \
