@@ -432,6 +432,21 @@ void Graphics::drawRectBuffer(ScreenArea area, uint32_t color) {
     drawRectBuffer(area.topLeft, area.bottomRight, color);
 }
 
+void Graphics::drawPixelBuffer(Point position, uint32_t color) {
+    Buf& b = bufs[back];
+    if (!b.pixels) return;
+
+    uint8_t* base = static_cast<uint8_t*>(b.pixels);
+
+    // Clip to the framebuffer so off-screen rects (e.g. an off-screen mouse
+    // sentinel) don't walk past the mmap and segfault init.
+    const int y_start = std::max(0, position.y);
+    const int x_start = std::max(0, position.x);
+
+    uint32_t* row = reinterpret_cast<uint32_t*>(base + y_start * b.pitch);
+    row[x_start] = color;
+}
+
 void Graphics::drawScreen() {
     Buf& b = bufs[back];
     timespec next_frame{};

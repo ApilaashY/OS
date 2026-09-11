@@ -1,26 +1,15 @@
 #include "./desktop.h"
+#include "../window/window.h"
 #include <iostream>
 
 Window* Desktop::addWindow(Window* window) {
     this->window.push_back(window);
 
     graphics->copyBuffer();
-    drawWindow(window);
+    window->render(graphics);
     graphics->drawScreen();
 
     return window;
-}
-
-void Desktop::drawWindow(Window* window) {
-    // Logic to draw a window
-    Point topLeft = window->getTopLeft();
-    Point bottomRight = window->getBottomRight();
-    for (int i = topLeft.y; i < bottomRight.y; i++) {
-        for (int j = topLeft.x; j < bottomRight.x; j++) {
-            Point p{j, i};
-            graphics->drawRectBuffer(p, p+1, 0xFFFFFFFF); // Example color
-        }
-    }
 }
 
 
@@ -40,7 +29,7 @@ void Desktop::drawMouse(Point p) {
     for (auto it = window.rbegin(); it != window.rend(); ++it) {
         const auto& win = *it;
         if (win->getScreenArea().overlaps(oldMouseArea)) {
-            drawWindow(win);
+            win->render(graphics);
         }
     }
 

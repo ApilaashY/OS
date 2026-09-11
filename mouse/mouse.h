@@ -29,3 +29,12 @@ public:
     bool leftPressed() const { return left_button; }
     bool rightPressed() const { return right_button; }
 };
+
+struct MouseClickEvent {
+    Point position;
+};
+
+struct MouseDragEvent {
+    Point startPosition;
+    Point endPosition;
+};

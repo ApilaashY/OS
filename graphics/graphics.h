@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../component/component.h"
-#include "../window/window.h"
 #include <cstdint>
 #include <vector>
 #include <drm/drm_mode.h>
@@ -22,6 +21,7 @@ public:
     void copyBuffer();
     void drawRectBuffer(Point x, Point y, uint32_t color);
     void drawRectBuffer(ScreenArea area, uint32_t color);
+    void drawPixelBuffer(Point position, uint32_t color);
     void drawScreen();
     uint32_t width() const;
     uint32_t height() const;

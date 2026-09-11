@@ -3,6 +3,8 @@
 #include <vector>
 #include "../graphics/graphics.h"
 
+class Window;
+
 class Desktop {
     uint32_t background_color;
     std::vector<Window*> window;
@@ -17,5 +19,4 @@ public:
     }
     Window* addWindow(Window* window);
     void drawMouse(Point p);
-    void drawWindow(Window* window);
 };

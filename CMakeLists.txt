@@ -43,6 +43,7 @@ add_library(application
 )
 target_include_directories(application PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/application)
 target_compile_features(application PUBLIC cxx_std_23)
+target_link_libraries(application PUBLIC screen)
 
 # --- window module ---
 add_library(window
@@ -50,6 +51,7 @@ add_library(window
 )
 target_include_directories(window PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/window)
 target_compile_features(window PUBLIC cxx_std_23)
+target_link_libraries(window PUBLIC application)
 
 # --- desktop module ---
 add_library(desktop

@@ -16,6 +16,8 @@
 #include "desktop/desktop.h"
 #include "component/box/box.h"
 #include "mouse/mouse.h"
+#include "window/window.h"
+#include "application/application.h"
 
 
 using namespace std;
@@ -30,8 +32,8 @@ int main(int argc, char* argv[]) {
 
     Desktop* desktop = new Desktop(g->width(), g->height(), background, g);
 
-
-    Window* box1 = new Window({100, 100}, {300, 300});
+    Application* app = new Application();
+    Window* box1 = new Window({100, 100}, {300, 300}, app);
     desktop->addWindow(dynamic_cast<Window*>(box1));
 
     Mouse* mouse = new Mouse(desktop, 800, 600);
