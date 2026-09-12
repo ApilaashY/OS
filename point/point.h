@@ -22,4 +22,5 @@ class ScreenArea {
 
     ScreenArea(Point topLeft, Point bottomRight): topLeft(topLeft), bottomRight(bottomRight) {}
     bool overlaps(const ScreenArea& other) const;
+    bool contains(const Point& point) const;
 };

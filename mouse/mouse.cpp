@@ -172,20 +172,45 @@ void Mouse::readMouse() {
 
         received_event = true;
 
+        bool position_changed = false;
+
         if (event.type == EV_REL) {
             if (event.code == REL_X) {
                 x_position += event.value * 4;
+                position_changed = true;
             } else if (event.code == REL_Y) {
                 y_position -= event.value * 4;
+                position_changed = true;
             }
         } else if (event.type == EV_ABS) {
             if (event.code == ABS_X) {
                 const int range = std::max(1, x_max - x_min);
                 x_position = std::clamp((event.value - x_min) * viewport_width / range, 0, viewport_width - 1);
+                position_changed = true;
             } else if (event.code == ABS_Y) {
                 const int range = std::max(1, y_max - y_min);
                 y_position = std::clamp((event.value - y_min) * viewport_height / range, 0, viewport_height - 1);
+                position_changed = true;
             }
+        } else if (event.type == EV_KEY) {
+            if (event.code == BTN_LEFT) {
+                const bool pressed = event.value != 0;
+                if (pressed && !left_button) {
+                    last_drag_x = x_position;
+                    last_drag_y = y_position;
+                    desktop->click({{x_position, y_position}});
+                }
+                left_button = pressed;
+            } else if (event.code == BTN_RIGHT) {
+                right_button = event.value != 0;
+            }
+        }
+
+        if (position_changed && left_button) {
+            // Use the last position (not the original press) so each event moves by its own delta.
+            desktop->drag({{last_drag_x, last_drag_y}, {x_position, y_position}});
+            last_drag_x = x_position;
+            last_drag_y = y_position;
         }
     }
 

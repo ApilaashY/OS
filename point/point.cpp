@@ -29,3 +29,8 @@ bool ScreenArea::overlaps(const ScreenArea& other) const {
     return !(bottomRight.x < other.topLeft.x || topLeft.x > other.bottomRight.x ||
              bottomRight.y < other.topLeft.y || topLeft.y > other.bottomRight.y);
 }
+
+bool ScreenArea::contains(const Point& point) const {
+    return point.x >= topLeft.x && point.x <= bottomRight.x &&
+           point.y >= topLeft.y && point.y <= bottomRight.y;
+}

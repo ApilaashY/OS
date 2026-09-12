@@ -1,12 +1,12 @@
 #include "component.h"
 
 void Component::move(Point move) {
-    x.x += move.x;
-    x.y += move.y;
-    y.x += move.x;
-    y.y += move.y;
+    topLeft.x += move.x;
+    topLeft.y += move.y;
+    bottomRight.x += move.x;
+    bottomRight.y += move.y;
 }
 
 ScreenArea Component::getScreenArea() const {
-    return ScreenArea(x, y);
+    return ScreenArea(topLeft, bottomRight);
 }

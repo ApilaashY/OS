@@ -3,7 +3,7 @@
 #include <iostream>
 
 Window* Desktop::addWindow(Window* window) {
-    this->window.push_back(window);
+    windows.push_back(window);
 
     graphics->copyBuffer();
     window->render(graphics);
@@ -26,7 +26,7 @@ void Desktop::drawMouse(Point p) {
     // Erase the cursor at its OLD position by repainting any window it covered.
     // Do it in reverse order to make sure the topmost components are drawn last and appear above the others.
     const ScreenArea oldMouseArea = ScreenArea(mouse-mouseRadius, mouse+mouseRadius);
-    for (auto it = window.rbegin(); it != window.rend(); ++it) {
+    for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
         const auto& win = *it;
         if (win->getScreenArea().overlaps(oldMouseArea)) {
             win->render(graphics);
@@ -39,4 +39,25 @@ void Desktop::drawMouse(Point p) {
     const ScreenArea newMouseArea = ScreenArea(mouse-mouseRadius, mouse+mouseRadius);
     graphics->drawRectBuffer(newMouseArea, 0xFF0000FF);
     graphics->drawScreen();
+}
+
+void Desktop::click(MouseClickEvent event) {
+    // Propagate the click event to the topmost window that contains the click position
+    for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
+        const auto& win = *it;
+        if (win->getScreenArea().contains(event.position)) {
+            win->onClick(event);
+            break;
+        }
+    }
+}
+void Desktop::drag(MouseDragEvent event) {
+    // Propagate the drag event to the topmost window that contains the drag start position
+    for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
+        const auto& win = *it;
+        if (win->getScreenArea().contains(event.startPosition)) {
+            win->onDrag(event);
+            break;
+        }
+    }
 }

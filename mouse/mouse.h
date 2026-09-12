@@ -16,6 +16,8 @@ class Mouse {
     bool left_button = false;
     bool right_button = false;
     bool received_event = false;
+    int last_drag_x = 0;
+    int last_drag_y = 0;
 
 public:
     explicit Mouse(Desktop* desktop, int viewport_width = 800, int viewport_height = 600)
@@ -28,13 +30,4 @@ public:
     int y() const { return y_position; }
     bool leftPressed() const { return left_button; }
     bool rightPressed() const { return right_button; }
-};
-
-struct MouseClickEvent {
-    Point position;
-};
-
-struct MouseDragEvent {
-    Point startPosition;
-    Point endPosition;
 };

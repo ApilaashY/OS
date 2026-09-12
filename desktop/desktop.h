@@ -7,7 +7,7 @@ class Window;
 
 class Desktop {
     uint32_t background_color;
-    std::vector<Window*> window;
+    std::vector<Window*> windows;
     Point mouse = {-100, -100};
     Graphics* graphics; 
     uint32_t width, height;
@@ -19,4 +19,6 @@ public:
     }
     Window* addWindow(Window* window);
     void drawMouse(Point p);
+    void click(MouseClickEvent event);
+    void drag(MouseDragEvent event);
 };

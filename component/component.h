@@ -2,14 +2,24 @@
 #include <cstdint>
 #include "../point/point.h"
 
+struct MouseClickEvent {
+    Point position;
+};
+
+struct MouseDragEvent {
+    Point startPosition;
+    Point endPosition;
+};
+
 class Component {
 protected:
-    Point x;
-    Point y;
+    Point topLeft;
+    Point bottomRight;
 public:
-    Component(Point x, Point y): x(x), y(y) {}
+    Component(Point topLeft, Point bottomRight): topLeft(topLeft), bottomRight(bottomRight) {}
     virtual ~Component() = default;
-    virtual uint32_t colorAt(Point p, int width, int height) const = 0;
     void move(Point move);
     ScreenArea getScreenArea() const;
+    virtual void onClick(MouseClickEvent event) = 0;
+    virtual void onDrag(MouseDragEvent event) = 0;
 };
